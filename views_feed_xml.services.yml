@@ -1,0 +1,15 @@
+services:
+  views_feed_xml.serializer:
+    class: Symfony\Component\Serializer\Serializer
+    parent: serializer
+  views_feed_xml.normalizer.entity_reference_field_paragraph_item:
+    class: Drupal\views_feed_xml\Normalizer\EntityReferenceFieldParagraphItemNormalizer
+    tags:
+      - { name: normalizer_deep, priority: 50 }
+  views_feed_xml.response_content_type_override:
+    class: Drupal\views_feed_xml\EventSubscriber\ResponseContentTypeOverride
+    tags:
+      - { name: event_subscriber }
+  plugin.manager.icecream:
+    class: Drupal\views_feed_xml\XslProcessPluginManager
+    parent: default_plugin_manager

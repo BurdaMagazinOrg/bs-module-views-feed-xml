@@ -1,0 +1,8 @@
+type: module
+name: Views Feed XML
+description: 'Provides a generic XML display style for feeds, customizable using XSL transformer Plugins'
+package: Freundin
+core: 8.x
+dependencies:
+  - serialization
+  - xsl_process
