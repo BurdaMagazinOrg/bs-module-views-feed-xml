@@ -2,12 +2,14 @@
 
 namespace Drupal\views_feed_xml\Plugin\views\style;
 
+use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Markup;
-use Drupal\Core\Url;
+use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\rest\Plugin\views\style\Serializer;
 use Drupal\xsl_process\StylesheetProcessor;
-use Drupal\views\Plugin\views\style\StylePluginBase;
-use Drupal\xsl_process\XslProcessorPluginManager;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\Serializer\SerializerInterface;
 
 /**
  * Default style plugin to render an RSS feed.
@@ -15,51 +17,76 @@ use Drupal\xsl_process\XslProcessorPluginManager;
  * @ingroup views_style_plugins
  *
  * @ViewsStyle(
- *   id = "xml",
- *   title = @Translation("XML Feed"),
- *   help = @Translation("Generates an Xml feed from a view."),
- *   display_types = {"feed"}
+ *   id = "serializer_xml",
+ *   title = @Translation("XML Transformed"),
+ *   help = @Translation("Generates an XML feed from a data display."),
+ *   display_types = {"data"}
  * )
  */
-class Xml extends StylePluginBase {
+class Xml extends Serializer {
 
   /**
-   * Does the style plugin for itself support to add fields to it's output.
-   *
-   * @var bool
+   * @var \Drupal\Component\Plugin\PluginManagerInterface
    */
-  protected $usesRowPlugin = FALSE;
+  protected $xslProcessPluginManager;
 
-  public function attachTo(array &$build, $display_id, Url $feed_url, $title) {
-    $url_options = array();
-    $input = $this->view->getExposedInput();
-    if ($input) {
-      $url_options['query'] = $input;
-    }
-    $url_options['absolute'] = TRUE;
+  /**
+   * @var \Symfony\Component\Serializer\SerializerInterface
+   */
+  protected $serializer;
 
-    $url = $feed_url->setOptions($url_options)->toString();
+  /**
+   * @var \Symfony\Component\EventDispatcher\EventSubscriberInterface
+   */
+  protected $responseContentTypeOverride;
 
-    // Add the RSS icon to the view.
-    $this->view->feedIcons[] = [
-      '#theme' => 'feed_icon',
-      '#url' => $url,
-      '#title' => $title,
-    ];
+  /**
+   * @var \Drupal\Core\Language\LanguageManagerInterface
+   */
+  protected $languageManager;
 
-    // Attach a link to the RSS feed, which is an alternate representation.
-    $build['#attached']['html_head_link'][][] = array(
-      'rel' => 'alternate',
-      'type' => 'application/xml',
-      'title' => $title,
-      'href' => $url,
+  public function __construct(
+    array $configuration,
+    $plugin_id,
+    $plugin_definition,
+    SerializerInterface $serializer,
+    array $serializer_formats,
+    PluginManagerInterface $xslProcessPluginManager,
+    EventSubscriberInterface $responseContentTypeOverride,
+    LanguageManagerInterface $languageManager
+  ) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $serializer, $serializer_formats);
+    $this->xslProcessPluginManager = $xslProcessPluginManager;
+    $this->responseContentTypeOverride = $responseContentTypeOverride;
+    $this->languageManager = $languageManager;
+  }
+
+  public static function create(
+    ContainerInterface $container,
+    array $configuration,
+    $plugin_id,
+    $plugin_definition
+  ) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('views_feed_xml.serializer'),
+      $container->getParameter('views_feed_xml.serializer.formats'),
+      $container->get('plugin.manager.xsl_process'),
+      $container->get('views_feed_xml.response_content_type_override'),
+      $container->get('language_manager')
     );
   }
 
   protected function defineOptions() {
     $options = parent::defineOptions();
-
-    $options['description'] = array('default' => '');
+    $options['formats'] = ['default' => ['xml']];
+    // TODO define all options
+    $options['description'] = ['default' => ''];
+    $options['content_type'] = ['default' => 'application/xml; charset=utf-8'];
+    // 'identity' is always available
+    $options['processor'] = ['default' => 'identity'];
 
     return $options;
   }
@@ -67,62 +94,87 @@ class Xml extends StylePluginBase {
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
-    $form['description'] = array(
+    unset($form['formats']);
+
+    $form['description'] = [
       '#type' => 'textfield',
       '#title' => $this->t('RSS description'),
       '#default_value' => $this->options['description'],
       '#description' => $this->t('This will appear in the RSS feed itself.'),
       '#maxlength' => 1024,
-    );
+    ];
 
-    // TODO inject
-    $manager = \Drupal::service('plugin.manager.xsl_process');
-    $plugins = $manager->getDefinitions();
+    $form['content_type'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Content Type header of resulting response'),
+      '#default_value' => $this->options['content_type'],
+      '#description' => $this->t('.'),
+      '#maxlength' => 64,
+    ];
+
+    $form['processor'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Processor to use'),
+      '#default_value' => $this->options['processor'],
+      '#description' => $this->t(
+        'The XSL processor plugin to transform the serialized XML.'
+      ),
+      '#options' => $this->getPluginOptions(),
+      '#required' => TRUE,
+    ];
+
+  }
+
+  public function render() {
+    // override for parent style
+    $this->options['formats'] = ['xml'];
+    $this->displayHandler->setContentType('xml');
+    $this->displayHandler->setMimeType($this->options['content_type']);
+
+    $xml = parent::render();
+
+    // load plugin and transform to final xml
+    $plugin = $this->xslProcessPluginManager->createInstance(
+      $this->options['processor']
+    );
+    $stylesheetProcessor = new StylesheetProcessor($plugin);
+
+    // params
+    $parameters['feed_language'] = $this->languageManager
+      ->getCurrentLanguage()
+      ->getId();
+
+    $link_display_id = $this->displayHandler->getLinkDisplay();
+    if ($link_display_id && $display = $this->view->displayHandlers->get($link_display_id)) {
+      $url = $this->view->getUrl(NULL, $link_display_id);
+      $url_options = ['absolute' => TRUE];
+      if (!empty($this->view->exposed_raw_input)) {
+        $url_options['query'] = $this->view->exposed_raw_input;
+      }
+      $url_string = $url->setOptions($url_options)->toString();
+      $parameters['feed_link'] = $url_string;
+    }
+
+    $parameters['feed_description'] = $this->options['description'];
+    $parameters['feed_title'] = $this->view->getTitle();
+
+    foreach ($parameters as $name => $value) {
+      $stylesheetProcessor->getXsltProcessor()->setParameter('', $name, $value);
+    }
+
+    $xml = $stylesheetProcessor->transform($xml);
+
+
+    return $xml;
+  }
+
+  private function getPluginOptions() {
+    $plugins = $this->xslProcessPluginManager->getDefinitions();
     $options = [];
     foreach ($plugins as $plugin) {
       $options[$plugin['id']] = $plugin['name'];
     }
-
-    $form['processor'] = array(
-      '#type' => 'select',
-      '#title' => $this->t('Processor to use'),
-      '#default_value' => $this->options['processor'],
-      '#description' => $this->t('The XSL processor plugin to transform the serialized XML.'),
-      '#options' => $options
-    );
-
-  }
-
-  /**
-   * Get RSS feed description.
-   *
-   * @return string
-   *   The string containing the description with the tokens replaced.
-   */
-  public function getDescription() {
-    return $this->options['description'];
-  }
-
-  public function render() {
-    $entities = [];
-    foreach ($this->view->result as $row) {
-      $entities[] = $row->_entity;
-    }
-    // TODO inject
-    $serializer = \Drupal::service('views_feed_xml.serializer');
-    $xml = $serializer->serialize($entities, 'xml');
-    // TODO inject
-    /** @var XslProcessorPluginManager $manager */
-    $manager = \Drupal::service('plugin.manager.xsl_process');
-    $plugin = $manager->createInstance($this->options['processor']);
-    $stylesheet = new StylesheetProcessor($plugin);
-    $xml = $stylesheet->transform($xml);
-    $build = array(
-      '#markup' => Markup::create($xml)
-    );
-    // TODO inject
-    \Drupal::service('views_feed_xml.response_content_type_override')->setContentType('application/xml');
-    return $build;
+    return $options;
   }
 
 }
