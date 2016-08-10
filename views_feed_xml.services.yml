@@ -10,6 +10,3 @@ services:
     class: Drupal\views_feed_xml\EventSubscriber\ResponseContentTypeOverride
     tags:
       - { name: event_subscriber }
-  plugin.manager.icecream:
-    class: Drupal\views_feed_xml\XslProcessPluginManager
-    parent: default_plugin_manager
