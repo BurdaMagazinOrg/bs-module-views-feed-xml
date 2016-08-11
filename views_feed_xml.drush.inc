@@ -8,11 +8,11 @@ use Drupal\node\Entity\Node;
 /**
  * Implements hook_drush_command().
  */
-function msn_feed_drush_command() {
+function views_feed_xml_drush_command() {
     $items = array();
 
-    $items['msn-test-feed'] = array(
-        'callback' => 'msn_feed_run_test_feed',
+    $items['views-feed-xml'] = array(
+        'callback' => 'views_feed_xml_run_test_feed',
         'description' => dt('Test command'),
         'options' => [],
         'examples' => [],
@@ -21,12 +21,12 @@ function msn_feed_drush_command() {
     return $items;
 }
 
-function msn_feed_run_test_feed() {
+function views_feed_xml_run_test_feed() {
 
     $q = \Drupal::entityQuery('node')
         ->condition('type', 'article')
         ->sort('created', 'DESC')
-        ->range(0, 10);
+        ->range(0, 20);
     $nodes = Node::loadMultiple($q->execute());
     /** @var \Symfony\Component\Serializer\Serializer $serializer */
     $serializer = \Drupal::service('views_feed_xml.serializer');

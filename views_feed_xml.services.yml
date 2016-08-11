@@ -1,12 +1,32 @@
 services:
+
+  # Serializer
   views_feed_xml.serializer:
     class: Symfony\Component\Serializer\Serializer
     parent: serializer
-  views_feed_xml.normalizer.entity_reference_field_paragraph_item:
-    class: Drupal\views_feed_xml\Normalizer\EntityReferenceFieldParagraphItemNormalizer
+
+  # Additional normalizers
+  views_feed_xml.normalizer.entity_reference_field_item_deep:
+    class: Drupal\views_feed_xml\Normalizer\EntityReferenceFieldItemDeepNormalizer
     tags:
       - { name: normalizer_deep, priority: 50 }
-  views_feed_xml.response_content_type_override:
-    class: Drupal\views_feed_xml\EventSubscriber\ResponseContentTypeOverride
+
+  views_feed_xml.normalizer.caching_content_entity:
+    class: Drupal\views_feed_xml\Normalizer\CachingContentEntityNormalizer
     tags:
-      - { name: event_subscriber }
+      - { name: normalizer_deep, priority: 50 }
+    arguments: ['@entity.manager', '@cache.views_feed_xml']
+
+  views_feed_xml.normalizer.list:
+    class: Drupal\views_feed_xml\Normalizer\ListNormalizer
+    tags:
+      - { name: normalizer_deep, priority: 50 }
+
+  # Cache for serialized content entities
+  cache.views_feed_xml:
+    class: Drupal\Core\Cache\CacheBackendInterface
+    tags:
+    - { name: cache.bin }
+    factory: cache_factory:get
+    arguments:
+      - views_feed_xml

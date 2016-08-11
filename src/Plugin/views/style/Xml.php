@@ -8,7 +8,6 @@ use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\rest\Plugin\views\style\Serializer;
 use Drupal\xsl_process\StylesheetProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Serializer\SerializerInterface;
 
 /**
@@ -18,8 +17,8 @@ use Symfony\Component\Serializer\SerializerInterface;
  *
  * @ViewsStyle(
  *   id = "serializer_xml",
- *   title = @Translation("XML Transformed"),
- *   help = @Translation("Generates an XML feed from a data display."),
+ *   title = @Translation("XML Transformed to Feed"),
+ *   help = @Translation("Generates an XML feed from a data display and an XSL transformer plugin."),
  *   display_types = {"data"}
  * )
  */
@@ -52,12 +51,10 @@ class Xml extends Serializer {
     SerializerInterface $serializer,
     array $serializer_formats,
     PluginManagerInterface $xslProcessPluginManager,
-    EventSubscriberInterface $responseContentTypeOverride,
     LanguageManagerInterface $languageManager
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $serializer, $serializer_formats);
     $this->xslProcessPluginManager = $xslProcessPluginManager;
-    $this->responseContentTypeOverride = $responseContentTypeOverride;
     $this->languageManager = $languageManager;
   }
 
@@ -74,15 +71,15 @@ class Xml extends Serializer {
       $container->get('views_feed_xml.serializer'),
       $container->getParameter('views_feed_xml.serializer.formats'),
       $container->get('plugin.manager.xsl_process'),
-      $container->get('views_feed_xml.response_content_type_override'),
       $container->get('language_manager')
     );
   }
 
   protected function defineOptions() {
     $options = parent::defineOptions();
+    // allow XML only
     $options['formats'] = ['default' => ['xml']];
-    // TODO define all options
+    $options['xml_base'] = ['default' => ''];
     $options['description'] = ['default' => ''];
     $options['content_type'] = ['default' => 'application/xml; charset=utf-8'];
     // 'identity' is always available
@@ -112,6 +109,14 @@ class Xml extends Serializer {
       '#maxlength' => 64,
     ];
 
+    $form['xml_base'] = array(
+      '#type' => 'textfield',
+      '#title' => $this->t('Base URL for feed links'),
+      '#default_value' => $this->options['xml_base'],
+      '#description' => $this->t('Sets the "xml:base" attribute on the feed root element. Can be used by consumers to resolve relative URLs. Will use Drupal\'s $base_url if empty.'),
+      '#maxlength' => 1024,
+    );
+
     $form['processor'] = [
       '#type' => 'select',
       '#title' => $this->t('Processor to use'),
@@ -126,7 +131,8 @@ class Xml extends Serializer {
   }
 
   public function render() {
-    // override for parent style
+    // override for parent style - these are properties accessed by parent:render()
+    // to select the appropriate output format
     $this->options['formats'] = ['xml'];
     $this->displayHandler->setContentType('xml');
     $this->displayHandler->setMimeType($this->options['content_type']);
@@ -139,24 +145,26 @@ class Xml extends Serializer {
     );
     $stylesheetProcessor = new StylesheetProcessor($plugin);
 
-    // params
-    $parameters['feed_language'] = $this->languageManager
-      ->getCurrentLanguage()
-      ->getId();
+    // set additional parameters
+    if (!empty($this->options['rendering_language'])) {
+      $parameters['feed_language'] = $this->options['rendering_language'];
+    } else {
+      $parameters['feed_language'] = $this->languageManager
+        ->getCurrentLanguage()
+        ->getId();
+    }
 
     $link_display_id = $this->displayHandler->getLinkDisplay();
     if ($link_display_id && $display = $this->view->displayHandlers->get($link_display_id)) {
+
       $url = $this->view->getUrl(NULL, $link_display_id);
-      $url_options = ['absolute' => TRUE];
-      if (!empty($this->view->exposed_raw_input)) {
-        $url_options['query'] = $this->view->exposed_raw_input;
-      }
-      $url_string = $url->setOptions($url_options)->toString();
+      $url_string = $url->setOptions(['absolute' => FALSE])->toString();
       $parameters['feed_link'] = $url_string;
     }
 
     $parameters['feed_description'] = $this->options['description'];
     $parameters['feed_title'] = $this->view->getTitle();
+    $parameters['feed_base'] = $this->getXmlBase();
 
     foreach ($parameters as $name => $value) {
       $stylesheetProcessor->getXsltProcessor()->setParameter('', $name, $value);
@@ -168,13 +176,18 @@ class Xml extends Serializer {
     return $xml;
   }
 
-  private function getPluginOptions() {
+  protected function getPluginOptions() {
     $plugins = $this->xslProcessPluginManager->getDefinitions();
     $options = [];
     foreach ($plugins as $plugin) {
       $options[$plugin['id']] = $plugin['name'];
     }
     return $options;
+  }
+
+  protected function getXmlBase() {
+    global $base_url;
+    return empty($this->options['xml_base']) ? $base_url : $this->options['xml_base'];
   }
 
 }
