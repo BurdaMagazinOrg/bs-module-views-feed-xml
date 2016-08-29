@@ -1,0 +1,13 @@
+{
+  "name": "burdamagazinorg/views_feed_xml",
+  "description": "BS Views Feed XML module.",
+  "type": "drupal-module",
+  "authors": [
+    {
+      "name": "ITCru",
+      "email": "steffen.schlaer@it-cru.de"
+    }
+  ],
+  "minimum-stability": "dev",
+  "require": {}
+}
