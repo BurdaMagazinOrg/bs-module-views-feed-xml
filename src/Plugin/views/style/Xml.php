@@ -50,10 +50,11 @@ class Xml extends Serializer {
     $plugin_definition,
     SerializerInterface $serializer,
     array $serializer_formats,
+    array $serializer_format_providers,
     PluginManagerInterface $xslProcessPluginManager,
     LanguageManagerInterface $languageManager
   ) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition, $serializer, $serializer_formats);
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $serializer, $serializer_formats, $serializer_format_providers);
     $this->xslProcessPluginManager = $xslProcessPluginManager;
     $this->languageManager = $languageManager;
   }
@@ -70,6 +71,7 @@ class Xml extends Serializer {
       $plugin_definition,
       $container->get('views_feed_xml.serializer'),
       $container->getParameter('views_feed_xml.serializer.formats'),
+      $container->getParameter('serializer.format_providers'),
       $container->get('plugin.manager.xsl_process'),
       $container->get('language_manager')
     );
