@@ -81,6 +81,7 @@ class Xml extends Serializer {
     $options['formats'] = ['default' => ['xml']];
     $options['xml_base'] = ['default' => ''];
     $options['description'] = ['default' => ''];
+    $options['title'] = ['default' => ''];
     $options['content_type'] = ['default' => 'application/xml; charset=utf-8'];
     // 'identity' is always available
     $options['processor'] = ['default' => 'identity'];
@@ -93,11 +94,19 @@ class Xml extends Serializer {
 
     unset($form['formats']);
 
+    $form['title'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('RSS title'),
+      '#default_value' => $this->options['title'],
+      '#description' => $this->t('This will appear in the RSS feed itself. Defaults to the view title if empty.'),
+      '#maxlength' => 255,
+    ];
+
     $form['description'] = [
       '#type' => 'textfield',
       '#title' => $this->t('RSS description'),
       '#default_value' => $this->options['description'],
-      '#description' => $this->t('This will appear in the RSS feed itself.'),
+      '#description' => $this->t('This will appear in the RSS feed itself. Empty by default.'),
       '#maxlength' => 1024,
     ];
 
@@ -105,7 +114,7 @@ class Xml extends Serializer {
       '#type' => 'textfield',
       '#title' => $this->t('Content Type header of resulting response'),
       '#default_value' => $this->options['content_type'],
-      '#description' => $this->t('.'),
+      '#description' => $this->t('Sets the "Content-Type" HTTP header."'),
       '#maxlength' => 64,
     ];
 
@@ -154,16 +163,9 @@ class Xml extends Serializer {
         ->getId();
     }
 
-    $link_display_id = $this->displayHandler->getLinkDisplay();
-    if ($link_display_id && $display = $this->view->displayHandlers->get($link_display_id)) {
-
-      $url = $this->view->getUrl(NULL, $link_display_id);
-      $url_string = $url->setOptions(['absolute' => FALSE])->toString();
-      $parameters['feed_link'] = $url_string;
-    }
-
+    $parameters['feed_link'] = $this->view->getUrl()->setOptions(['absolute' => FALSE])->toString();
     $parameters['feed_description'] = $this->options['description'];
-    $parameters['feed_title'] = $this->view->getTitle();
+    $parameters['feed_title'] = empty($this->options['title']) ? $this->view->getTitle() : $this->options['title'];
     $parameters['feed_base'] = $this->getXmlBase();
 
     foreach ($parameters as $name => $value) {
@@ -171,7 +173,6 @@ class Xml extends Serializer {
     }
 
     $xml = $stylesheetProcessor->transform($xml);
-
 
     return $xml;
   }
