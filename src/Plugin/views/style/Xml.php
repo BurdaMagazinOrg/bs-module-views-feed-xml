@@ -6,6 +6,7 @@ use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\rest\Plugin\views\style\Serializer;
+use Drupal\views_feed_xml\Util\XmlHelper;
 use Drupal\xsl_process\StylesheetProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -147,6 +148,7 @@ class Xml extends Serializer {
     $this->displayHandler->setMimeType($this->options['content_type']);
 
     $xml = parent::render();
+    $xml = XmlHelper::stripInvalidControlChars($xml);
 
     // load plugin and transform to final xml
     $plugin = $this->xslProcessPluginManager->createInstance(
