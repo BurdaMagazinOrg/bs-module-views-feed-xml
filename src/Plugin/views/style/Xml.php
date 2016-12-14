@@ -188,6 +188,10 @@ class Xml extends Serializer {
     return $options;
   }
 
+  public function getFormats() {
+    return empty($this->options['formats']) ? [] : $this->options['formats'];
+  }
+
   protected function getXmlBase() {
     global $base_url;
     return empty($this->options['xml_base']) ? $base_url : $this->options['xml_base'];
