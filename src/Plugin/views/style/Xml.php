@@ -95,7 +95,9 @@ class Xml extends Serializer {
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
-    unset($form['formats']);
+    // Disable formats selection by user because module provide only XML as
+    // formatter. We set XML formatter as default in defineOptions method.
+    $form['formats']['#disabled'] = TRUE;
 
     $form['title'] = [
       '#type' => 'textfield',
