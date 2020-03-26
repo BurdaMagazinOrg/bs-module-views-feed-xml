@@ -6,7 +6,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
 use Drupal\Core\Image\Image;
 use Drupal\file\Entity\File;
-use Drupal\media_entity\Entity\Media;
+use Drupal\media\Entity\Media;
 use Drupal\paragraphs\Entity\Paragraph;
 use Drupal\serialization\Normalizer\ComplexDataNormalizer;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
