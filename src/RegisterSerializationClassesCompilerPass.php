@@ -14,7 +14,7 @@ class RegisterSerializationClassesCompilerPass extends BaseCompilerPass {
   /**
    * Adds services to the Serializer.
    *
-   * TODO see whether this can be done in a cleaner way
+   * TODO see whether this can be done in a cleaner way.
    *
    * @param \Symfony\Component\DependencyInjection\ContainerBuilder $container
    *   The container to process.
@@ -45,7 +45,7 @@ class RegisterSerializationClassesCompilerPass extends BaseCompilerPass {
     }
 
     // Find all serialization formats known.
-    $formats = array();
+    $formats = [];
     foreach ($container->findTaggedServiceIds('encoder') as $attributes) {
       $formats[] = $attributes[0]['format'];
     }

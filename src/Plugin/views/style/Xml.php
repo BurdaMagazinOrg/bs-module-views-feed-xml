@@ -26,25 +26,36 @@ use Symfony\Component\Serializer\SerializerInterface;
 class Xml extends Serializer {
 
   /**
+   * The plugin manager interface.
+   *
    * @var \Drupal\Component\Plugin\PluginManagerInterface
    */
   protected $xslProcessPluginManager;
 
   /**
+   * The serializer interface.
+   *
    * @var \Symfony\Component\Serializer\SerializerInterface
    */
   protected $serializer;
 
   /**
+   * The event suscriber interface.
+   *
    * @var \Symfony\Component\EventDispatcher\EventSubscriberInterface
    */
   protected $responseContentTypeOverride;
 
   /**
+   * The language manager interface.
+   *
    * @var \Drupal\Core\Language\LanguageManagerInterface
    */
   protected $languageManager;
 
+  /**
+   * Constructor of Xml class.
+   */
   public function __construct(
     array $configuration,
     $plugin_id,
@@ -60,6 +71,9 @@ class Xml extends Serializer {
     $this->languageManager = $languageManager;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public static function create(
     ContainerInterface $container,
     array $configuration,
@@ -78,9 +92,12 @@ class Xml extends Serializer {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function defineOptions() {
     $options = parent::defineOptions();
-    // allow XML only
+    // Allow XML only.
     $options['formats'] = ['default' => ['xml']];
     $options['xml_base'] = ['default' => ''];
     $options['description'] = ['default' => ''];
@@ -92,6 +109,9 @@ class Xml extends Serializer {
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
 
@@ -123,13 +143,13 @@ class Xml extends Serializer {
       '#maxlength' => 64,
     ];
 
-    $form['xml_base'] = array(
+    $form['xml_base'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Base URL for feed links'),
       '#default_value' => $this->options['xml_base'],
       '#description' => $this->t('Sets the "xml:base" attribute on the feed root element. Can be used by consumers to resolve relative URLs. Will use Drupal\'s $base_url if empty.'),
       '#maxlength' => 1024,
-    );
+    ];
 
     $form['processor'] = [
       '#type' => 'select',
@@ -141,12 +161,14 @@ class Xml extends Serializer {
       '#options' => $this->getPluginOptions(),
       '#required' => TRUE,
     ];
-
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function render() {
-    // override for parent style - these are properties accessed by parent:render()
-    // to select the appropriate output format
+    // Override parent style - these are properties accessed by parent:render()
+    // to select the appropriate output format.
     $this->options['formats'] = ['xml'];
     $this->displayHandler->setContentType('xml');
     $this->displayHandler->setMimeType($this->options['content_type']);
@@ -154,16 +176,17 @@ class Xml extends Serializer {
     $xml = parent::render();
     $xml = XmlHelper::stripInvalidControlChars($xml);
 
-    // load plugin and transform to final xml
+    // Load plugin and transform to final xml.
     $plugin = $this->xslProcessPluginManager->createInstance(
       $this->options['processor']
     );
     $stylesheetProcessor = new StylesheetProcessor($plugin);
 
-    // set additional parameters
+    // Set additional parameters.
     if (!empty($this->options['rendering_language'])) {
       $parameters['feed_language'] = $this->options['rendering_language'];
-    } else {
+    }
+    else {
       $parameters['feed_language'] = $this->languageManager
         ->getCurrentLanguage()
         ->getId();
@@ -179,10 +202,12 @@ class Xml extends Serializer {
     }
 
     $xml = $stylesheetProcessor->transform($xml);
-
     return $xml;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function getPluginOptions() {
     $plugins = $this->xslProcessPluginManager->getDefinitions();
     $options = [];
@@ -192,10 +217,16 @@ class Xml extends Serializer {
     return $options;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function getFormats() {
     return empty($this->options['formats']) ? [] : $this->options['formats'];
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function getXmlBase() {
     global $base_url;
     return empty($this->options['xml_base']) ? $base_url : $this->options['xml_base'];

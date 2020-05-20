@@ -29,16 +29,16 @@ class EntityReferenceFieldItemDeepNormalizer extends ComplexDataNormalizer {
   public function normalize($field_item, $format = NULL, array $context = []) {
 
     $normalized = [];
-
     if (empty($context['reference_recursion_stack'])) {
       $context['reference_recursion_stack'] = [];
     }
 
     /** @var \Drupal\Core\Entity\EntityInterface $entity */
     if (($entity = $field_item->get('entity')->getValue()) && $entity instanceof ContentEntityInterface) {
-
       if ($this->needsRecursion($entity)) {
-        // use key check for recursion stack array as it's much faster and the order doesn't matter
+
+        // Use key check for recursion stack array as it's much faster
+        // and the order doesn't matter.
         if (isset($context['reference_recursion_stack'][$entity->uuid()])) {
           $normalized['target_recursion'] = TRUE;
         }
@@ -53,8 +53,8 @@ class EntityReferenceFieldItemDeepNormalizer extends ComplexDataNormalizer {
         }
       }
 
-      // this part comes from Drupal\serialization\Normalizer\EntityReferenceFieldItemNormalizer::normalize,
-      // we have to copy it to catch the exception from url()
+      // This part comes from core EntityReferenceFieldItemNormalizer::normalize
+      // we have to copy it to catch the exception from url().
       $normalized['target_type'] = $entity->getEntityTypeId();
       $normalized['target_uuid'] = $entity->uuid();
 
@@ -62,8 +62,9 @@ class EntityReferenceFieldItemDeepNormalizer extends ComplexDataNormalizer {
         if ($url = $entity->url('canonical', ['absolute' => FALSE])) {
           $normalized['url'] = $url;
         }
-      } catch (RouteNotFoundException $e) {
-        // this is expected to happen if an entity (e.g. custom entity) has no route
+      }
+      catch (RouteNotFoundException $e) {
+        // This is expected to happen if an entity has no route.
       }
 
     }
@@ -71,6 +72,9 @@ class EntityReferenceFieldItemDeepNormalizer extends ComplexDataNormalizer {
     return $normalized + parent::normalize($field_item, $format, $context);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function needsRecursion(ContentEntityInterface $entity) {
     return (
       $entity instanceof Paragraph

@@ -3,13 +3,12 @@
 namespace Drupal\views_feed_xml\Util;
 
 /**
- * © 2016 Valiton GmbH
+ * XmlHelper utility class.
  */
 class XmlHelper {
 
-  /*
-   * XML doesn't allow for chars < \x20 except for \x09, \x0A and \x0D,
-   * so we strip them.
+  /**
+   * XML doesn't allow some special chars so we strip them.
    */
   public static function stripInvalidControlChars($string) {
     return str_replace([
